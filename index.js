@@ -45,31 +45,31 @@ app.get('/search', async (req, res) => {
 });
 
 // Obtener URL de audio
-app.get('/audio/:videoId', async (req, res) => {
+aapp.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const stdout = await ytDlp.execPromise([
+    
+    const args = [
       url,
       '-f', 'bestaudio[ext=m4a]/bestaudio',
       '--get-url',
       '--no-playlist',
-      '--cookies', cookiesPath,
-      '--add-header', 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    ]);
+      '--sleep-requests', '2',
+      '--no-warnings',
+    ];
+
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+
+    const stdout = await ytDlp.execPromise(args);
     res.json({ url: stdout.trim() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error obteniendo audio' });
   }
 });
-
-if (process.env.COOKIES_CONTENT) {
-  fs.writeFileSync(cookiesPath, process.env.COOKIES_CONTENT);
-  console.log('Cookies escritas, tamaño:', process.env.COOKIES_CONTENT.length);
-} else {
-  console.log('ERROR: COOKIES_CONTENT no encontrado');
-}
 
 // Obtener URL de video
 app.get('/video/:videoId', async (req, res) => {
