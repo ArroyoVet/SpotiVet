@@ -68,7 +68,7 @@ app.get('/audio/:videoId', async (req, res) => {
     // -g extrae SOLO el link directo sin descargar el video
     // -f "bestaudio[ext=m4a]" busca el formato más rápido para tu app
     // OJO: Si tu archivo de cookies se llama distinto a 'cookies.txt', cámbialo aquí.
-    const command = `yt-dlp --cookies cookies.txt -f "bestaudio[ext=m4a]/bestaudio" -g "https://www.youtube.com/watch?v=${videoId}"`;
+    const command = `./yt-dlp --cookies cookies.txt -f "bestaudio[ext=m4a]/bestaudio" -g "https://www.youtube.com/watch?v=${videoId}"`;
     
     const { stdout } = await execPromise(command);
     const directUrl = stdout.trim();
