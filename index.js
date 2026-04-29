@@ -50,23 +50,11 @@ app.get('/search', async (req, res) => {
 app.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    const args = [
-      url,
-      '-f', 'bestaudio[ext=m4a]/bestaudio',
-      '--get-url',
-      '--no-playlist',
-      '--sleep-requests', '2',
-      '--no-warnings',
-    ];
-
-    if (fs.existsSync(cookiesPath)) {
-      args.push('--cookies', cookiesPath);
-    }
-
-    const stdout = await ytDlp.execPromise(args);
-    res.json({ url: stdout.trim() });
+    const response = await axios.get(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+    const streams = response.data.audioStreams;
+    const best = streams.find(s => s.mimeType?.includes('m4a')) || streams[0];
+    if (!best) return res.status(404).json({ error: 'No se encontró audio' });
+    res.json({ url: best.url });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error obteniendo audio' });
