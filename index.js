@@ -39,29 +39,23 @@ app.get('/search', async (req, res) => {
 });
 
 app.get('/audio/:videoId', async (req, res) => {
-    const trackUrl = req.params.videoId; 
-    console.log(`[AUDIO] Generando streaming para: ${trackUrl}`);
+    const trackUrl = req.params.videoId;
+    console.log(`[AUDIO] Intentando streaming directo para: ${trackUrl}`);
 
     try {
-        // Usamos getInfo para obtener todos los metadatos y protocolos de streaming
-        const info = await scdl.getInfo(trackUrl);
+        // download() es la función base de la librería, es casi imposible que falle
+        const stream = await scdl.download(trackUrl);
         
-        // Buscamos el formato mp3 en la lista de transcodings
-        const mp3Format = info.media.transcodings.find(t => t.format.mime_type === 'audio/mpeg');
+        // Le decimos al celular que lo que viene es un audio mpeg (mp3)
+        res.setHeader('Content-Type', 'audio/mpeg');
         
-        if (mp3Format) {
-            // Obtenemos la URL final desde el protocolo de SoundCloud
-            const streamUrl = await scdl.getStreamUrl(trackUrl); 
-            console.log("[AUDIO] ¡Éxito! URL de SoundCloud obtenida.");
-            return res.json({ url: streamUrl });
-        } else {
-            // Si no hay mp3, intentamos el método directo por defecto
-            const fallbackUrl = await scdl.getStreamUrl(trackUrl);
-            return res.json({ url: fallbackUrl });
-        }
+        // Conectamos la descarga de SoundCloud directamente con la respuesta del servidor
+        stream.pipe(res);
+
+        console.log("[AUDIO] Transmitiendo audio exitosamente.");
     } catch (error) {
-        console.error(`[AUDIO-ERROR] SoundCloud falló: ${error.message}`);
-        return res.status(500).json({ error: 'No se pudo obtener el audio' });
+        console.error(`[AUDIO-ERROR] Fallo crítico: ${error.message}`);
+        res.status(500).json({ error: 'No se pudo procesar el audio de SoundCloud' });
     }
 });
 
