@@ -8,11 +8,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// yt-dlp-wrap descarga el binario correcto para el SO automáticamente
-const ytDlp = new YTDlpWrap();
+// Descargar binario al arrancar
+const ytDlpPath = path.join(__dirname, 'yt-dlp');
+YTDlpWrap.downloadFromGithub(ytDlpPath)
+  .then(() => console.log('yt-dlp descargado correctamente'))
+  .catch(err => console.error('Error descargando yt-dlp:', err));
 
-// Descargar binario al arrancar si no existe
-YTDlpWrap.downloadFromGithub().catch(() => {});
+const ytDlp = new YTDlpWrap(ytDlpPath);
 
 // Buscar canción
 app.get('/search', async (req, res) => {
