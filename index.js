@@ -8,6 +8,7 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 const cookiesPath = path.join(__dirname, 'cookies_temp.txt');
 if (process.env.COOKIES_CONTENT) {
