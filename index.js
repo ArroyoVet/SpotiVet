@@ -54,8 +54,8 @@ app.get('/audio/:videoId', async (req, res) => {
       '-f', 'bestaudio[ext=m4a]/bestaudio',
       '--get-url',
       '--no-playlist',
-      '--cookies',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      '--cookies', cookiesPath,
+      '--add-header', 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     ]);
     res.json({ url: stdout.trim() });
   } catch (err) {
@@ -63,6 +63,13 @@ app.get('/audio/:videoId', async (req, res) => {
     res.status(500).json({ error: 'Error obteniendo audio' });
   }
 });
+
+if (process.env.COOKIES_CONTENT) {
+  fs.writeFileSync(cookiesPath, process.env.COOKIES_CONTENT);
+  console.log('Cookies escritas, tamaño:', process.env.COOKIES_CONTENT.length);
+} else {
+  console.log('ERROR: COOKIES_CONTENT no encontrado');
+}
 
 // Obtener URL de video
 app.get('/video/:videoId', async (req, res) => {
