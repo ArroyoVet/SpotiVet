@@ -58,19 +58,32 @@ const PIPED_INSTANCES = [
 
 app.get('/audio/:videoId', async (req, res) => {
   const { videoId } = req.params;
-  
+  console.log(`[AUDIO] Empezando búsqueda para el video ID: ${videoId}`);
+
   for (const instance of PIPED_INSTANCES) {
     try {
+      console.log(`[AUDIO] Intentando conectar con: ${instance}`);
       const response = await axios.get(`${instance}/streams/${videoId}`, { timeout: 8000 });
       const streams = response.data.audioStreams;
-      if (!streams || streams.length === 0) continue;
+      
+      if (!streams || streams.length === 0) {
+        console.log(`[AUDIO] ${instance} no devolvió streams válidos.`);
+        continue;
+      }
+      
       const best = streams.find(s => s.mimeType?.includes('m4a')) || streams[0];
-      if (best?.url) return res.json({ url: best.url });
-    } catch (_) {
+      if (best?.url) {
+        console.log(`[AUDIO] ¡Éxito! URL obtenida desde: ${instance}`);
+        return res.json({ url: best.url });
+      }
+    } catch (error) {
+      // Aquí atrapamos y mostramos el error exacto de cada instancia
+      console.log(`[AUDIO] Falló ${instance}. Motivo: ${error.message}`);
       continue;
     }
   }
-  
+
+  console.log(`[AUDIO] CRÍTICO: Todas las instancias de Piped fallaron para el ID ${videoId}`);
   res.status(500).json({ error: 'No se pudo obtener audio de ninguna instancia' });
 });
 
