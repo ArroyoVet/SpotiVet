@@ -15,6 +15,7 @@
     "bgutils-js": "^3.2.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "soundcloud-downloader": "^1.0.0",
     "youtube-search-api": "^2.0.1",
     "yt-dlp-wrap": "^2.3.12"
   }
