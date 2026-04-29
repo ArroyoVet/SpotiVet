@@ -3,10 +3,17 @@ const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const YTDlpWrap = require('yt-dlp-wrap').default;
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const cookiesPath = path.join(__dirname, 'cookies_temp.txt');
+if (process.env.COOKIES_CONTENT) {
+  fs.writeFileSync(cookiesPath, process.env.COOKIES_CONTENT);
+  console.log('Cookies escritas correctamente');
+}
 
 // Descargar binario al arrancar
 const ytDlpPath = path.join(__dirname, 'yt-dlp');
@@ -47,6 +54,7 @@ app.get('/audio/:videoId', async (req, res) => {
       '-f', 'bestaudio[ext=m4a]/bestaudio',
       '--get-url',
       '--no-playlist',
+      '--cookies',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     ]);
     res.json({ url: stdout.trim() });
