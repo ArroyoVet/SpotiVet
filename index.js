@@ -1,14 +1,18 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const { exec } = require('child_process');
 const path = require('path');
+const YTDlpWrap = require('yt-dlp-wrap').default;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const YTDLP = path.join(__dirname, 'yt-dlp.exe');
+// yt-dlp-wrap descarga el binario correcto para el SO automáticamente
+const ytDlp = new YTDlpWrap();
+
+// Descargar binario al arrancar si no existe
+YTDlpWrap.downloadFromGithub().catch(() => {});
 
 // Buscar canción
 app.get('/search', async (req, res) => {
@@ -36,40 +40,34 @@ app.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    exec(
-      `"${YTDLP}" -f bestaudio[ext=m4a]/bestaudio --get-url --no-playlist --js-runtimes node --cookies cookies.txt --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" "${url}"`,
-      { timeout: 30000 },
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error(stderr);
-          return res.status(500).json({ error: 'Error obteniendo audio' });
-        }
-        res.json({ url: stdout.trim() });
-      }
-    );
+    const stdout = await ytDlp.execPromise([
+      url,
+      '-f', 'bestaudio[ext=m4a]/bestaudio',
+      '--get-url',
+      '--no-playlist',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    ]);
+    res.json({ url: stdout.trim() });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Error obteniendo audio' });
   }
 });
 
-// Obtener URL de video (MP4)
+// Obtener URL de video
 app.get('/video/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    // Pedimos el mejor formato que tenga video y audio combinados (suele ser mp4) con un tope de 720p para que cargue rápido
-    exec(
-      `"${YTDLP}" -f "best[ext=mp4][height<=720]/best" --get-url --no-playlist --js-runtimes node --cookies cookies.txt "${url}"`,
-      { timeout: 30000 },
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error(stderr);
-          return res.status(500).json({ error: 'Error obteniendo video' });
-        }
-        res.json({ url: stdout.trim() });
-      }
-    );
+    const stdout = await ytDlp.execPromise([
+      url,
+      '-f', 'best[ext=mp4][height<=720]/best',
+      '--get-url',
+      '--no-playlist',
+    ]);
+    res.json({ url: stdout.trim() });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Error obteniendo video' });
   }
 });
@@ -106,10 +104,7 @@ app.get('/cover', async (req, res) => {
   }
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
-  console.log('=================================');
-  console.log('¡LA RUTA DE VIDEO ESTÁ CARGADA!');
-  console.log('=================================');
 });
