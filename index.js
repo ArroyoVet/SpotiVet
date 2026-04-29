@@ -13,6 +13,8 @@ const cookiesPath = path.join(__dirname, 'cookies_temp.txt');
 if (process.env.COOKIES_CONTENT) {
   fs.writeFileSync(cookiesPath, process.env.COOKIES_CONTENT);
   console.log('Cookies escritas correctamente');
+  console.log('Primera línea cookies:', process.env.COOKIES_CONTENT.split('\n')[0]);
+  console.log('Total líneas:', process.env.COOKIES_CONTENT.split('\n').length);
 }
 
 // Descargar binario al arrancar
