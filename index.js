@@ -45,7 +45,7 @@ app.get('/search', async (req, res) => {
 });
 
 // Obtener URL de audio
-aapp.get('/audio/:videoId', async (req, res) => {
+app.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
     const url = `https://www.youtube.com/watch?v=${videoId}`;
