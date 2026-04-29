@@ -50,7 +50,7 @@ app.get('/search', async (req, res) => {
 app.get('/audio/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
-    const response = await axios.get(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+    const response = await axios.get(`https://piped-api.garudalinux.org/streams/${videoId}`);
     const streams = response.data.audioStreams;
     const best = streams.find(s => s.mimeType?.includes('m4a')) || streams[0];
     if (!best) return res.status(404).json({ error: 'No se encontró audio' });
