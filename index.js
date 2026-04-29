@@ -38,23 +38,26 @@ app.get('/search', async (req, res) => {
     }
 });
 
-// 2. OBTENER AUDIO (Streaming directo de SoundCloud)
 app.get('/audio/:videoId', async (req, res) => {
-    // El videoId ahora es la URL de SoundCloud que enviamos en el search
     const trackUrl = req.params.videoId; 
     console.log(`[AUDIO] Generando streaming para: ${trackUrl}`);
 
     try {
-        const streamUrls = await scdl.getStreamingUrls(trackUrl);
+        // Usamos getInfo para obtener todos los metadatos y protocolos de streaming
+        const info = await scdl.getInfo(trackUrl);
         
-        // Intentamos obtener el formato mp3 progresivo (el más estable para Android)
-        const finalUrl = streamUrls.http_mp3_128_url || streamUrls.hls_mp3_128_url || streamUrls.hls_opus_64_url;
-
-        if (finalUrl) {
-            console.log("[AUDIO] ¡Éxito! URL de streaming enviada.");
-            return res.json({ url: finalUrl });
+        // Buscamos el formato mp3 en la lista de transcodings
+        const mp3Format = info.media.transcodings.find(t => t.format.mime_type === 'audio/mpeg');
+        
+        if (mp3Format) {
+            // Obtenemos la URL final desde el protocolo de SoundCloud
+            const streamUrl = await scdl.getStreamUrl(trackUrl); 
+            console.log("[AUDIO] ¡Éxito! URL de SoundCloud obtenida.");
+            return res.json({ url: streamUrl });
         } else {
-            throw new Error("No se encontró un formato de audio compatible");
+            // Si no hay mp3, intentamos el método directo por defecto
+            const fallbackUrl = await scdl.getStreamUrl(trackUrl);
+            return res.json({ url: fallbackUrl });
         }
     } catch (error) {
         console.error(`[AUDIO-ERROR] SoundCloud falló: ${error.message}`);
