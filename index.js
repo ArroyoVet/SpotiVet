@@ -46,37 +46,31 @@ app.get('/search', async (req, res) => {
   }
 });
 
-// Obtener URL de audio
-app.get('/audio/:videoId', async (req, res) => {
-  try {
-    const { videoId } = req.params;
-    const response = await axios.get(`https://pipedapi.adminforge.de/streams/${videoId}`);
-    const streams = response.data.audioStreams;
-    const best = streams.find(s => s.mimeType?.includes('m4a')) || streams[0];
-    if (!best) return res.status(404).json({ error: 'No se encontró audio' });
-    res.json({ url: best.url });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error obteniendo audio' });
-  }
-});
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.leptons.xyz',
+  'https://piped-api.privacy.com.de',
+  'https://api.piped.yt',
+  'https://pipedapi.drgns.space',
+  'https://pipedapi.darkness.services',
+];
 
-// Obtener URL de video
-app.get('/video/:videoId', async (req, res) => {
-  try {
-    const { videoId } = req.params;
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const stdout = await ytDlp.execPromise([
-      url,
-      '-f', 'best[ext=mp4][height<=720]/best',
-      '--get-url',
-      '--no-playlist',
-    ]);
-    res.json({ url: stdout.trim() });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error obteniendo video' });
+app.get('/audio/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const response = await axios.get(`${instance}/streams/${videoId}`, { timeout: 8000 });
+      const streams = response.data.audioStreams;
+      if (!streams || streams.length === 0) continue;
+      const best = streams.find(s => s.mimeType?.includes('m4a')) || streams[0];
+      if (best?.url) return res.json({ url: best.url });
+    } catch (_) {
+      continue;
+    }
   }
+  
+  res.status(500).json({ error: 'No se pudo obtener audio de ninguna instancia' });
 });
 
 // Obtener letra
