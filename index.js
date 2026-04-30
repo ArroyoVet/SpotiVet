@@ -7,14 +7,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Lista de servidores Piped alternativos para evitar el error 502
+const PIPED_INSTANCES = [
+    'https://pipedapi.kavin.rocks',
+    'https://pipedapi.tokhmi.xyz',
+    'https://pipedapi.smnz.de',
+    'https://api.piped.projectsegfau.lt',
+    'https://piped-api.lunar.icu'
+];
+
 // 1. BUSCADOR UNIVERSAL (YouTube)
-// Esto te dará acceso a toda la música comercial, remixes y sonidos para animales.
 app.get('/search', async (req, res) => {
     try {
         const { q } = req.query;
         console.log(`[BUSQUEDA] Consultando: ${q}`);
         
-        // Buscamos los primeros 10 resultados
         const results = await YouTubeSearchApi.GetListByKeyword(q, false, 10);
         
         const songs = results.items
@@ -34,44 +41,42 @@ app.get('/search', async (req, res) => {
     }
 });
 
-// 2. GENERADOR DE STREAMING (Anti-Bloqueo)
-// Usamos una instancia pública de Piped como puente para evitar que Render sea bloqueado.
+// 2. GENERADOR DE STREAMING (Auto-Fallback de alta resistencia)
 app.get('/audio/:videoId', async (req, res) => {
     const { videoId } = req.params;
     console.log(`[AUDIO] Obteniendo stream para: ${videoId}`);
 
-    try {
-        // Consultamos a una instancia de Piped (comunidad de código abierto)
-        // Estas instancias rotan IPs y son muy difíciles de bloquear.
-        const response = await axios.get(`https://pipedapi.kavin.rocks/streams/${videoId}`);
-        
-        // Filtramos para obtener solo el audio en formato M4A o MP3
-        const audioStream = response.data.audioStreams.find(s => s.format === 'M4A' || s.extension === 'm4a');
-        
-        if (audioStream && audioStream.url) {
-            console.log("[AUDIO] Enlace directo enviado al celular.");
-            res.json({ url: audioStream.url });
-        } else {
-            throw new Error("No se encontró un flujo de audio compatible");
-        }
-    } catch (error) {
-        console.error(`[AUDIO-ERROR] Falló la extracción: ${error.message}`);
-        // Intentamos una segunda instancia si la primera falla (Auto-Fallback)
+    // Intentamos extraer el audio rotando por los servidores disponibles
+    for (const instance of PIPED_INSTANCES) {
         try {
-            const fallback = await axios.get(`https://api.piped.victr.me/streams/${videoId}`);
-            const fbStream = fallback.data.audioStreams[0];
-            res.json({ url: fbStream.url });
-        } catch (e) {
-            res.status(500).json({ error: 'La canción no está disponible en esta región' });
+            console.log(`[AUDIO] Probando servidor: ${instance}`);
+            // Le damos 4 segundos máximo a cada servidor para responder
+            const response = await axios.get(`${instance}/streams/${videoId}`, { timeout: 4000 });
+            
+            if (response.data && response.data.audioStreams) {
+                const audioStream = response.data.audioStreams.find(s => s.format === 'M4A' || s.extension === 'm4a') || 
+                                    response.data.audioStreams[0]; // Si no hay m4a, cogemos el primer audio disponible
+                
+                if (audioStream && audioStream.url) {
+                    console.log(`[AUDIO] ¡Éxito! Enlace obtenido de ${instance}`);
+                    return res.json({ url: audioStream.url });
+                }
+            }
+        } catch (error) {
+            console.log(`[WARN] El servidor ${instance} falló (${error.message}). Saltando al siguiente...`);
+            // El loop continúa silenciosamente hacia el siguiente servidor
         }
     }
+
+    // Si llega hasta aquí, es que TODOS los servidores fallaron
+    console.error(`[AUDIO-ERROR] Colapso total de instancias para el ID: ${videoId}`);
+    res.status(502).json({ error: 'Los servidores comunitarios están saturados. Intenta en unos segundos.' });
 });
 
 // 3. LETRAS SINCRONIZADAS (LrcLib)
 app.get('/lyrics', async (req, res) => {
     try {
         const { title, artist } = req.query;
-        // Limpiamos el título para mejorar la puntería de la letra
         const cleanTitle = title.replace(/\(.*?\)|\[.*?\]|official|video/gi, '').trim();
         
         const response = await axios.get('https://lrclib.net/api/search', {
@@ -91,5 +96,5 @@ app.get('/lyrics', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SpotiVet Backend v3 (Hybrid YouTube) en puerto ${PORT}`);
+    console.log(`🚀 SpotiVet Backend v4 (Multi-Instancia) en puerto ${PORT}`);
 });
