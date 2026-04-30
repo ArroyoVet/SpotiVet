@@ -7,13 +7,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Lista de servidores Piped alternativos para evitar el error 502
-const PIPED_INSTANCES = [
-    'https://pipedapi.kavin.rocks',
-    'https://pipedapi.tokhmi.xyz',
-    'https://pipedapi.smnz.de',
-    'https://api.piped.projectsegfau.lt',
-    'https://piped-api.lunar.icu'
+// Combinamos las mejores instancias de Piped Y de Invidious
+const YT_APIS = [
+    // --- Servidores Invidious (Súper estables para audio) ---
+    { url: 'https://invidious.nerdvpn.de/api/v1/videos/', type: 'invidious' },
+    { url: 'https://inv.tux.pizza/api/v1/videos/', type: 'invidious' },
+    { url: 'https://invidious.asir.dev/api/v1/videos/', type: 'invidious' },
+    // --- Servidores Piped (De respaldo) ---
+    { url: 'https://pipedapi.kavin.rocks/streams/', type: 'piped' },
+    { url: 'https://pipedapi.tokhmi.xyz/streams/', type: 'piped' }
 ];
 
 // 1. BUSCADOR UNIVERSAL (YouTube)
@@ -41,39 +43,46 @@ app.get('/search', async (req, res) => {
     }
 });
 
-// 2. GENERADOR DE STREAMING (Auto-Fallback de alta resistencia)
+// 2. GENERADOR DE STREAMING (Motor Híbrido Invidious + Piped)
 app.get('/audio/:videoId', async (req, res) => {
     const { videoId } = req.params;
-    console.log(`[AUDIO] Obteniendo stream para: ${videoId}`);
+    console.log(`\n[AUDIO] Buscando stream para ID: ${videoId}`);
 
-    // Intentamos extraer el audio rotando por los servidores disponibles
-    for (const instance of PIPED_INSTANCES) {
+    for (const api of YT_APIS) {
         try {
-            console.log(`[AUDIO] Probando servidor: ${instance}`);
-            // Le damos 4 segundos máximo a cada servidor para responder
-            const response = await axios.get(`${instance}/streams/${videoId}`, { timeout: 4000 });
+            console.log(`[AUDIO] Intentando con: ${api.url}`);
             
-            if (response.data && response.data.audioStreams) {
-                const audioStream = response.data.audioStreams.find(s => s.format === 'M4A' || s.extension === 'm4a') || 
-                                    response.data.audioStreams[0]; // Si no hay m4a, cogemos el primer audio disponible
-                
-                if (audioStream && audioStream.url) {
-                    console.log(`[AUDIO] ¡Éxito! Enlace obtenido de ${instance}`);
-                    return res.json({ url: audioStream.url });
+            // Subimos el timeout a 10 segundos (10000ms). ¡La paciencia es clave aquí!
+            const response = await axios.get(`${api.url}${videoId}`, { timeout: 10000 });
+            
+            // Lógica si el servidor que respondió es Invidious
+            if (api.type === 'invidious' && response.data?.adaptiveFormats) {
+                // Buscamos formato mp4 audio o webm audio
+                const stream = response.data.adaptiveFormats.find(f => f.type.includes('audio/mp4') || f.type.includes('audio/webm'));
+                if (stream?.url) {
+                    console.log(`[AUDIO] ✅ ¡Éxito con Invidious!`);
+                    return res.json({ url: stream.url });
+                }
+            }
+            // Lógica si el servidor que respondió es Piped
+            else if (api.type === 'piped' && response.data?.audioStreams) {
+                const stream = response.data.audioStreams.find(s => s.format === 'M4A' || s.extension === 'm4a') || response.data.audioStreams[0];
+                if (stream?.url) {
+                    console.log(`[AUDIO] ✅ ¡Éxito con Piped!`);
+                    return res.json({ url: stream.url });
                 }
             }
         } catch (error) {
-            console.log(`[WARN] El servidor ${instance} falló (${error.message}). Saltando al siguiente...`);
-            // El loop continúa silenciosamente hacia el siguiente servidor
+            // Imprimimos el error limpio para no saturar los logs
+            console.log(`[WARN] ❌ Falló (${error.message}) - Saltando al siguiente...`);
         }
     }
 
-    // Si llega hasta aquí, es que TODOS los servidores fallaron
-    console.error(`[AUDIO-ERROR] Colapso total de instancias para el ID: ${videoId}`);
-    res.status(502).json({ error: 'Los servidores comunitarios están saturados. Intenta en unos segundos.' });
+    console.error(`[AUDIO-ERROR] Colapso total. Ningún motor pudo descifrar el ID: ${videoId}`);
+    res.status(502).json({ error: 'Servidores comunitarios saturados.' });
 });
 
-// 3. LETRAS SINCRONIZADAS (LrcLib)
+// 3. LETRAS SINCRONIZADAS
 app.get('/lyrics', async (req, res) => {
     try {
         const { title, artist } = req.query;
@@ -96,5 +105,5 @@ app.get('/lyrics', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SpotiVet Backend v4 (Multi-Instancia) en puerto ${PORT}`);
+    console.log(`🚀 SpotiVet Backend v5 (Híbrido Invidious/Piped) en puerto ${PORT}`);
 });
