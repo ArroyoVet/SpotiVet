@@ -7,25 +7,28 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Combinamos las mejores instancias de Piped Y de Invidious
-const YT_APIS = [
-    // --- Servidores Invidious (Súper estables para audio) ---
-    { url: 'https://invidious.nerdvpn.de/api/v1/videos/', type: 'invidious' },
-    { url: 'https://inv.tux.pizza/api/v1/videos/', type: 'invidious' },
-    { url: 'https://invidious.asir.dev/api/v1/videos/', type: 'invidious' },
-    // --- Servidores Piped (De respaldo) ---
-    { url: 'https://pipedapi.kavin.rocks/streams/', type: 'piped' },
-    { url: 'https://pipedapi.tokhmi.xyz/streams/', type: 'piped' }
-];
+// --- RUTA DE INICIO (RESTABLECIDA) ---
+app.get('/', (req, res) => {
+    res.send(`
+        <div style="background-color: #121212; color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+            <div style="padding: 40px; border-radius: 20px; background-color: #1E1E1E; text-align: center; border: 2px solid #1DB954; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h1 style="color: #1DB954; font-size: 3rem; margin-bottom: 10px;">🐾 SpotiVet</h1>
+                <p style="font-size: 1.2rem; color: #B3B3B3;">Servidor de Búsqueda y Letras Sincronizadas</p>
+                <div style="margin-top: 30px; display: inline-block; padding: 10px 25px; background-color: #1DB954; color: black; border-radius: 50px; font-weight: bold; letter-spacing: 1px;">
+                    STATUS: ONLINE 🚀
+                </div>
+                <p style="margin-top: 20px; font-size: 0.9rem; color: #555;">Conectado desde la red de SpotiVet App</p>
+            </div>
+        </div>
+    `);
+});
 
-// 1. BUSCADOR UNIVERSAL (YouTube)
+// --- BUSCADOR ---
 app.get('/search', async (req, res) => {
     try {
         const { q } = req.query;
         console.log(`[BUSQUEDA] Consultando: ${q}`);
-        
         const results = await YouTubeSearchApi.GetListByKeyword(q, false, 10);
-        
         const songs = results.items
             .filter(item => item.type === 'video')
             .map(item => ({
@@ -35,63 +38,20 @@ app.get('/search', async (req, res) => {
                 duration: item.length?.simpleText || '0:00',
                 thumbnail: item.thumbnail?.thumbnails[0]?.url || ''
             }));
-
         res.json(songs);
     } catch (err) {
-        console.error('[ERROR-SEARCH]', err.message);
         res.status(500).json({ error: 'Error en el buscador' });
     }
 });
 
-// 2. GENERADOR DE STREAMING (Motor Híbrido Invidious + Piped)
-app.get('/audio/:videoId', async (req, res) => {
-    const { videoId } = req.params;
-    console.log(`\n[AUDIO] Buscando stream para ID: ${videoId}`);
-
-    for (const api of YT_APIS) {
-        try {
-            console.log(`[AUDIO] Intentando con: ${api.url}`);
-            
-            // Subimos el timeout a 10 segundos (10000ms). ¡La paciencia es clave aquí!
-            const response = await axios.get(`${api.url}${videoId}`, { timeout: 10000 });
-            
-            // Lógica si el servidor que respondió es Invidious
-            if (api.type === 'invidious' && response.data?.adaptiveFormats) {
-                // Buscamos formato mp4 audio o webm audio
-                const stream = response.data.adaptiveFormats.find(f => f.type.includes('audio/mp4') || f.type.includes('audio/webm'));
-                if (stream?.url) {
-                    console.log(`[AUDIO] ✅ ¡Éxito con Invidious!`);
-                    return res.json({ url: stream.url });
-                }
-            }
-            // Lógica si el servidor que respondió es Piped
-            else if (api.type === 'piped' && response.data?.audioStreams) {
-                const stream = response.data.audioStreams.find(s => s.format === 'M4A' || s.extension === 'm4a') || response.data.audioStreams[0];
-                if (stream?.url) {
-                    console.log(`[AUDIO] ✅ ¡Éxito con Piped!`);
-                    return res.json({ url: stream.url });
-                }
-            }
-        } catch (error) {
-            // Imprimimos el error limpio para no saturar los logs
-            console.log(`[WARN] ❌ Falló (${error.message}) - Saltando al siguiente...`);
-        }
-    }
-
-    console.error(`[AUDIO-ERROR] Colapso total. Ningún motor pudo descifrar el ID: ${videoId}`);
-    res.status(502).json({ error: 'Servidores comunitarios saturados.' });
-});
-
-// 3. LETRAS SINCRONIZADAS
+// --- LETRAS ---
 app.get('/lyrics', async (req, res) => {
     try {
         const { title, artist } = req.query;
-        const cleanTitle = title.replace(/\(.*?\)|\[.*?\]|official|video/gi, '').trim();
-        
+        const cleanTitle = title.replace(/\(.*?\)|\[.*?\]|official|video|audio/gi, '').trim();
         const response = await axios.get('https://lrclib.net/api/search', {
             params: { q: `${cleanTitle} ${artist}` }
         });
-
         const match = response.data[0];
         if (match) {
             res.json({ lyrics: match.syncedLyrics || match.plainLyrics });
@@ -105,5 +65,5 @@ app.get('/lyrics', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SpotiVet Backend v5 (Híbrido Invidious/Piped) en puerto ${PORT}`);
+    console.log(`🚀 SpotiVet Backend v6 (Hybrid Ready) en puerto ${PORT}`);
 });
